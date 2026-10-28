@@ -1,0 +1,3 @@
+- [x] Fix monthly rent and simplify settings, bill form, and receipt.
+- [x] Show extra paid consistently in summaries, history, and payments.
+- [x] Verify calculations and saving/reading a bill without login.
