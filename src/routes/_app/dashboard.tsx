@@ -7,6 +7,7 @@ import { fetchBills, fetchPendingProfiles, fetchSettings, reviewAccount } from "
 import { monthLabel, paymentBalance, paymentStatus, taka } from "@/lib/bill";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { AuthGate } from "@/components/AuthGate";
 import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/_app/dashboard")({
@@ -26,7 +27,11 @@ export const Route = createFileRoute("/_app/dashboard")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  component: Dashboard,
+  component: () => (
+    <AuthGate level="signedIn" title="Sign in to open the dashboard">
+      <Dashboard />
+    </AuthGate>
+  ),
 });
 
 function Stat({ label, value, sub }: { label: string; value: string; sub?: string | undefined }) {
@@ -41,7 +46,7 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
 
 function Dashboard() {
   const qc = useQueryClient();
-  const { profile, isOwner } = useAuth();
+  const { profile, isOwner, isApproved } = useAuth();
   const bills = useQuery({ queryKey: ["bills"], queryFn: fetchBills });
   const settings = useQuery({ queryKey: ["settings"], queryFn: fetchSettings });
   const pending = useQuery({
@@ -108,7 +113,7 @@ function Dashboard() {
         </p>
       </div>
 
-      {!settings.isLoading && !settings.data && (
+      {isOwner && !settings.isLoading && !settings.data && (
         <div className="rounded-xl border border-primary bg-secondary p-4 text-sm">
           First, save your house details and electricity rate in{" "}
           <Link to="/settings" className="font-semibold text-primary underline">
@@ -228,11 +233,13 @@ function Dashboard() {
         />
       </div>
       <div className="flex flex-col gap-3 sm:flex-row">
-        <Button asChild size="lg" className="h-14 text-base">
-          <Link to="/bills/new">
-            <Plus className="mr-2 h-5 w-5" /> Add Monthly Bill
-          </Link>
-        </Button>
+        {isApproved && (
+          <Button asChild size="lg" className="h-14 text-base">
+            <Link to="/bills/new">
+              <Plus className="mr-2 h-5 w-5" /> Add Monthly Bill
+            </Link>
+          </Button>
+        )}
         <Button asChild size="lg" variant="outline" className="h-14 text-base">
           <Link to="/history">
             <History className="mr-2 h-5 w-5" /> View Bill History

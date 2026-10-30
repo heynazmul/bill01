@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { BillForm } from "@/components/BillForm";
-import { RequireApproved } from "@/components/RequireApproved";
+import { AuthGate } from "@/components/AuthGate";
 
 export const Route = createFileRoute("/_app/bills/new")({
   head: () => ({
@@ -22,11 +22,11 @@ export const Route = createFileRoute("/_app/bills/new")({
     ],
   }),
   component: () => (
-    <RequireApproved>
+    <AuthGate level="approved">
       <div className="space-y-6">
         <h1 className="text-2xl font-bold">Add Monthly Bill</h1>
         <BillForm />
       </div>
-    </RequireApproved>
+    </AuthGate>
   ),
 });

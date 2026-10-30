@@ -16,10 +16,7 @@ export function AuthCard({
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
       <div className="w-full max-w-md">
-        <Link
-          to="/dashboard"
-          className="mb-6 flex items-center justify-center gap-2 font-bold text-primary"
-        >
+        <Link to="/" className="mb-6 flex items-center justify-center gap-2 font-bold text-primary">
           <Home className="h-5 w-5" /> House Bill Tracker
         </Link>
         <div className="rounded-xl border bg-card p-6 shadow-sm">

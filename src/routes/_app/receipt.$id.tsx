@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Pencil } from "lucide-react";
 import { fetchBill, fetchSettings } from "@/lib/data";
 import { useAuth } from "@/lib/auth";
+import { AuthGate } from "@/components/AuthGate";
 import { ReceiptView } from "@/components/ReceiptActions";
 import { Button } from "@/components/ui/button";
 
@@ -28,6 +29,14 @@ export const Route = createFileRoute("/_app/receipt/$id")({
 
 function ReceiptPage() {
   const { id } = Route.useParams();
+  return (
+    <AuthGate level="signedIn" title="Sign in to view this receipt">
+      <ReceiptContent id={id} />
+    </AuthGate>
+  );
+}
+
+function ReceiptContent({ id }: { id: string }) {
   const { isApproved } = useAuth();
   const bill = useQuery({ queryKey: ["bill", id], queryFn: () => fetchBill(id) });
   const settings = useQuery({ queryKey: ["settings"], queryFn: fetchSettings });

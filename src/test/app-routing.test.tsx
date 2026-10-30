@@ -6,29 +6,29 @@ import { routeTree } from "@/routeTree.gen";
 
 // Match routes without running loaders or rendering: loaders may need a server or
 // network the test run lacks, and jsdom never loads the stylesheets React waits on.
+function router() {
+  return createRouter({ routeTree, context: { queryClient: new QueryClient() } });
+}
+
 describe("App routing", () => {
   it("matches a page for / instead of falling back to not found", () => {
-    const router = createRouter({ routeTree, context: { queryClient: new QueryClient() } });
-
-    const matches = router.matchRoutes("/");
+    const matches = router().matchRoutes("/");
 
     expect(matches.at(-1)?.routeId).not.toBe(rootRouteId);
   });
 
-  it.each(["/dashboard", "/history", "/receipt/example", "/login", "/signup"])(
+  it.each(["/history", "/login", "/signup"])(
     "opens the public page %s without an authentication redirect",
     (path) => {
-      const router = createRouter({ routeTree, context: { queryClient: new QueryClient() } });
-      const matches = router.matchRoutes(path);
+      const matches = router().matchRoutes(path);
       expect(matches.at(-1)?.routeId).not.toBe(rootRouteId);
     },
   );
 
-  it.each(["/bills/new", "/bills/example/edit", "/settings"])(
-    "keeps %s reachable so the approval gate can explain the login requirement",
+  it.each(["/dashboard", "/receipt/example", "/bills/new", "/bills/example/edit", "/settings"])(
+    "keeps %s reachable so the login gate can explain what is required",
     (path) => {
-      const router = createRouter({ routeTree, context: { queryClient: new QueryClient() } });
-      const matches = router.matchRoutes(path);
+      const matches = router().matchRoutes(path);
       expect(matches.at(-1)?.routeId).not.toBe(rootRouteId);
     },
   );

@@ -135,7 +135,8 @@ This project was built with [Lovable](https://lovable.dev).
 
 The app has three access levels:
 
-- **Public (no login)** — view the dashboard, bill history, receipts and settings.
+- **Public (no login)** — bill history only.
+- **Signed-in account** — dashboard and receipts; pending accounts stay read-only.
 - **Approved account** — add/edit bills and record payments.
 - **Owner** — everything above, plus change settings and approve or reject new accounts from the dashboard.
 

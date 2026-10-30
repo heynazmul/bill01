@@ -38,6 +38,9 @@ function HistoryPage() {
   const qc = useQueryClient();
   const { user, profile, isApproved } = useAuth();
   const canManage = isApproved;
+  // Receipts are behind the login gate; anonymous visitors only see the table.
+  const canViewReceipt = Boolean(user) && profile?.status !== "rejected";
+  const columnCount = canViewReceipt ? 11 : 10;
   const { data = [], isLoading } = useQuery({ queryKey: ["bills"], queryFn: fetchBills });
   const settings = useQuery({ queryKey: ["settings"], queryFn: fetchSettings });
   const [fMonth, setFMonth] = useState(0);
@@ -128,13 +131,18 @@ function HistoryPage() {
       {!canManage && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-secondary p-4 text-sm">
           <p>
-            You are viewing public bill history. Sign in with an approved account to add bills or
-            record payments.
+            Bill history is public. Sign in with an approved account to add bills or record
+            payments.
           </p>
           {!user ? (
-            <Button asChild size="sm">
-              <Link to="/login">Log in</Link>
-            </Button>
+            <div className="flex gap-2">
+              <Button asChild size="sm">
+                <Link to="/login">Log in</Link>
+              </Button>
+              <Button asChild size="sm" variant="outline">
+                <Link to="/signup">Sign up</Link>
+              </Button>
+            </div>
           ) : profile?.status === "pending" ? (
             <span className="font-medium text-warning-foreground">Waiting for owner approval</span>
           ) : (
@@ -158,7 +166,7 @@ function HistoryPage() {
                 "Paid",
                 "Due",
                 "Extra paid",
-                "Actions",
+                ...(canViewReceipt ? ["Actions"] : []),
               ].map((h) => (
                 <th key={h} className="px-3 py-3 font-semibold">
                   {h}
@@ -169,18 +177,20 @@ function HistoryPage() {
           <tbody className="divide-y">
             {isLoading && (
               <tr>
-                <td colSpan={11} className="p-6 text-center text-muted-foreground">
+                <td colSpan={columnCount} className="p-6 text-center text-muted-foreground">
                   Loading…
                 </td>
               </tr>
             )}
             {!isLoading && rows.length === 0 && (
               <tr>
-                <td colSpan={11} className="p-6 text-center text-muted-foreground">
+                <td colSpan={columnCount} className="p-6 text-center text-muted-foreground">
                   No bills yet.{" "}
-                  <Link to="/bills/new" className="text-primary underline">
-                    Add one
-                  </Link>
+                  {canManage && (
+                    <Link to="/bills/new" className="text-primary underline">
+                      Add one
+                    </Link>
+                  )}
                 </td>
               </tr>
             )}
@@ -202,42 +212,48 @@ function HistoryPage() {
                 <td className="px-3 py-3 font-semibold text-success">
                   {taka(paymentBalance(Number(b.total), Number(b.amount_paid)).extraPaid)}
                 </td>
-                <td className="px-3 py-2">
-                  <div className="flex gap-1">
-                    <Button asChild size="icon" variant="ghost" title="View receipt">
-                      <Link to="/receipt/$id" params={{ id: b.id }} aria-label="View receipt">
-                        <Eye className="h-4 w-4" />
-                      </Link>
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      title="Download PDF"
-                      aria-label="Download PDF"
-                      onClick={() => pdf(b)}
-                    >
-                      <Download className="h-4 w-4" />
-                    </Button>
-                    {canManage && (
-                      <>
-                        <Button asChild size="icon" variant="ghost" title="Edit">
-                          <Link to="/bills/$id/edit" params={{ id: b.id }} aria-label="Edit record">
-                            <Pencil className="h-4 w-4" />
-                          </Link>
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          title="Record payment"
-                          aria-label="Record payment"
-                          onClick={() => setPayBill(b)}
-                        >
-                          <Wallet className="h-4 w-4" />
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                </td>
+                {canViewReceipt && (
+                  <td className="px-3 py-2">
+                    <div className="flex gap-1">
+                      <Button asChild size="icon" variant="ghost" title="View receipt">
+                        <Link to="/receipt/$id" params={{ id: b.id }} aria-label="View receipt">
+                          <Eye className="h-4 w-4" />
+                        </Link>
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        title="Download PDF"
+                        aria-label="Download PDF"
+                        onClick={() => pdf(b)}
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                      {canManage && (
+                        <>
+                          <Button asChild size="icon" variant="ghost" title="Edit">
+                            <Link
+                              to="/bills/$id/edit"
+                              params={{ id: b.id }}
+                              aria-label="Edit record"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Link>
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            title="Record payment"
+                            aria-label="Record payment"
+                            onClick={() => setPayBill(b)}
+                          >
+                            <Wallet className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

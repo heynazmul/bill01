@@ -9,7 +9,7 @@ import { FIXED_HOUSE_RENT, taka } from "@/lib/bill";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RequireApproved } from "@/components/RequireApproved";
+import { AuthGate } from "@/components/AuthGate";
 
 export const Route = createFileRoute("/_app/settings")({
   head: () => ({
@@ -29,9 +29,9 @@ export const Route = createFileRoute("/_app/settings")({
     ],
   }),
   component: () => (
-    <RequireApproved ownerOnly>
+    <AuthGate level="owner">
       <SettingsPage />
-    </RequireApproved>
+    </AuthGate>
   ),
 });
 

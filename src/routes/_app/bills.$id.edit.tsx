@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { BillForm } from "@/components/BillForm";
-import { RequireApproved } from "@/components/RequireApproved";
+import { AuthGate } from "@/components/AuthGate";
 import { fetchBill } from "@/lib/data";
 import { monthLabel } from "@/lib/bill";
 
@@ -34,13 +34,13 @@ function EditBill() {
   if (isLoading) return <p className="text-muted-foreground">Loading…</p>;
   if (error || !data) return <p className="text-destructive">Bill not found.</p>;
   return (
-    <RequireApproved>
+    <AuthGate level="approved">
       <div className="space-y-6">
         <h1 className="text-2xl font-bold">
           Edit bill — {monthLabel(data.bill_year, data.bill_month)}
         </h1>
         <BillForm key={data.id + data.updated_at} existing={data} />
       </div>
-    </RequireApproved>
+    </AuthGate>
   );
 }
