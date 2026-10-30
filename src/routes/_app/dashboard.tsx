@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { History, Plus, Check, X } from "lucide-react";
+import { History, Plus, Check, X, Bell } from "lucide-react";
 import { fetchBills, fetchPendingProfiles, fetchSettings, reviewAccount } from "@/lib/data";
 import { monthLabel, paymentBalance, paymentStatus, taka } from "@/lib/bill";
 import { Button } from "@/components/ui/button";
@@ -54,10 +54,11 @@ function Dashboard() {
     queryFn: fetchPendingProfiles,
     enabled: isOwner,
     retry: false,
-    refetchInterval: 20_000,
+    refetchInterval: 15_000,
   });
   const [reviewing, setReviewing] = useState<string | null>(null);
   const previousPending = useRef<number | null>(null);
+  const notifiedOnce = useRef(false);
 
   const now = new Date();
   const list = bills.data ?? [];
@@ -76,11 +77,23 @@ function Dashboard() {
 
   const pendingCount = pending.data?.length ?? 0;
 
-  // Show a toast when a new account request appears while the dashboard is open.
+  // Notify the owner about sign-ups: once when they open the dashboard, then
+  // whenever a new request appears while the page is open.
   useEffect(() => {
     if (!isOwner || !pending.data) return;
     const count = pending.data.length;
-    if (previousPending.current !== null && count > previousPending.current) {
+
+    if (previousPending.current === null) {
+      const seen =
+        typeof sessionStorage === "undefined"
+          ? null
+          : sessionStorage.getItem("accountRequestsSeen");
+      if (count > 0 && seen !== String(count) && !notifiedOnce.current) {
+        notifiedOnce.current = true;
+        toast.info(`${count} account request${count === 1 ? "" : "s"} waiting for approval`);
+        sessionStorage.setItem("accountRequestsSeen", String(count));
+      }
+    } else if (count > previousPending.current) {
       const newest = pending.data[count - 1];
       toast.info(
         newest
@@ -88,6 +101,7 @@ function Dashboard() {
           : "New account request",
       );
     }
+
     previousPending.current = count;
   }, [isOwner, pending.data]);
 
@@ -112,6 +126,23 @@ function Dashboard() {
           {settings.data?.tenant_name || "Set your house details in Settings"}
         </p>
       </div>
+
+      {isOwner && pendingCount > 0 && (
+        <a
+          href="#account-requests"
+          className="flex items-center gap-3 rounded-xl border border-warning/60 bg-warning/10 p-4 text-sm transition-colors hover:bg-warning/20"
+        >
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-warning text-warning-foreground">
+            <Bell className="h-4 w-4" />
+          </span>
+          <span>
+            <span className="font-semibold">
+              {pendingCount} account request{pendingCount === 1 ? "" : "s"} waiting for approval
+            </span>
+            <span className="block text-muted-foreground">Review and approve them below.</span>
+          </span>
+        </a>
+      )}
 
       {isOwner && !settings.isLoading && !settings.data && (
         <div className="rounded-xl border border-primary bg-secondary p-4 text-sm">

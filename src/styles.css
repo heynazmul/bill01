@@ -156,8 +156,35 @@
   }
 }
 
+@layer utilities {
+  /* Hind Siliguri is loaded in the root route head. The rest of the stack
+     covers macOS, Windows and Android devices without a webfont. */
+  .font-bangla {
+    font-family:
+      "Hind Siliguri", "Noto Sans Bengali", "Bangla Sangam MN", "Nirmala UI", "Kalpurush",
+      "SolaimanLipi", system-ui, sans-serif;
+  }
+}
+
 @media print {
-  .no-print { display: none !important; }
-  body { background: white; }
-  .receipt { max-width: none; padding: 0; }
+  @page {
+    size: A4;
+    margin: 10mm;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+  html,
+  body {
+    background: #fff;
+  }
+  .receipt {
+    max-width: none;
+    padding: 0;
+    background: #fff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    break-inside: avoid;
+  }
 }

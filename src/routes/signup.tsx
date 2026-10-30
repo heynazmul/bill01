@@ -213,7 +213,7 @@ function SignupPage() {
           {busy ? "Creating account…" : "Create account"}
         </Button>
         <p className="text-center text-xs text-muted-foreground">
-          The first account becomes the house owner automatically. Later accounts wait for approval.
+          Only the admin account becomes the house owner. Every other account waits for approval.
         </p>
       </form>
     </AuthCard>

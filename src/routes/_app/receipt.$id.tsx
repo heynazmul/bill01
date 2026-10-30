@@ -51,7 +51,7 @@ function ReceiptContent({ id }: { id: string }) {
         isApproved ? (
           <Button asChild variant="outline">
             <Link to="/bills/$id/edit" params={{ id }}>
-              <Pencil className="mr-2 h-4 w-4" /> Edit
+              <Pencil className="mr-2 h-4 w-4" /> সম্পাদনা
             </Link>
           </Button>
         ) : null

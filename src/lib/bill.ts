@@ -1,6 +1,16 @@
 export const MONTHS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
 ];
 
 export function monthLabel(year: number, month: number) {
@@ -42,6 +52,18 @@ export function paymentStatus(total: number, paid: number) {
   if (paid <= 0) return "Unpaid";
   if (paid >= total) return "Paid";
   return "Partially paid";
+}
+
+/**
+ * Remaining due to carry into the next bill, taken from the newest bill.
+ * `bills` must be ordered newest first, as `fetchBills()` returns it.
+ */
+export function carriedDue(
+  bills: ReadonlyArray<{ total: number | string; amount_paid: number | string }>,
+): number {
+  const last = bills[0];
+  if (!last) return 0;
+  return paymentBalance(Number(last.total), Number(last.amount_paid)).due;
 }
 
 export function billNumber(no: number, year: number, month: number) {

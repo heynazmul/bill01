@@ -1,9 +1,12 @@
 -- Account approval for the Monthly House Bill Tracker.
 --
--- Public visitors keep read-only access to bills and house settings.
--- Signed-in users whose profile status is "approved" may add/edit bills,
--- record payments and change settings.
--- The owner approves new accounts from the dashboard.
+-- Only bill history is public. Signed-in users whose profile status is
+-- "approved" may add/edit bills and record payments; the owner also changes
+-- settings and approves accounts from the dashboard.
+--
+-- The account heynazmulhossain@gmail.com is the house admin: it always becomes
+-- the owner, even if other people signed up first. Every other sign-up starts
+-- as a pending member.
 --
 -- Run this file once in the Supabase SQL editor (or with the Supabase CLI)
 -- before using the login/approval screens.
@@ -37,8 +40,8 @@ as $$
     select 1
     from public.profiles
     where id = auth.uid()
-      and role = 'owner'
       and status = 'approved'
+      and (role = 'owner' or lower(email) = 'heynazmulhossain@gmail.com')
   );
 $$;
 
@@ -63,7 +66,7 @@ grant execute on function public.is_owner() to authenticated;
 grant execute on function public.is_approved() to authenticated;
 
 -- Create a profile for every new auth user.
--- The first account becomes the owner automatically; later accounts wait for approval.
+-- The configured admin email becomes the owner; everyone else waits for approval.
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -71,21 +74,35 @@ security definer
 set search_path = public
 as $$
 declare
-  first_user boolean;
+  admin_email constant text := 'heynazmulhossain@gmail.com';
+  is_admin boolean := lower(coalesce(new.email, '')) = admin_email;
 begin
-  select not exists (select 1 from public.profiles) into first_user;
-
   insert into public.profiles (id, email, display_name, role, status, approved_at, approved_by)
   values (
     new.id,
     coalesce(new.email, ''),
     nullif(new.raw_user_meta_data ->> 'display_name', ''),
-    case when first_user then 'owner' else 'member' end,
-    case when first_user then 'approved' else 'pending' end,
-    case when first_user then now() else null end,
-    case when first_user then new.id else null end
+    case when is_admin then 'owner' else 'member' end,
+    case when is_admin then 'approved' else 'pending' end,
+    case when is_admin then now() else null end,
+    case when is_admin then new.id else null end
   )
-  on conflict (id) do nothing;
+  on conflict (id) do update
+    set email = excluded.email,
+        role = 'owner',
+        status = 'approved',
+        approved_at = coalesce(public.profiles.approved_at, now()),
+        updated_at = now()
+    where excluded.role = 'owner';
+
+  -- There is a single house admin.
+  if is_admin then
+    update public.profiles
+    set role = 'member',
+        updated_at = now()
+    where role = 'owner'
+      and id <> new.id;
+  end if;
 
   return new;
 end;
@@ -107,6 +124,16 @@ begin
   from auth.users
   on conflict (id) do nothing;
 
+  -- Promote the admin email first, wherever it sits in the sign-up order.
+  update public.profiles
+  set role = 'owner',
+      status = 'approved',
+      approved_at = coalesce(approved_at, now()),
+      approved_by = coalesce(approved_by, id),
+      updated_at = now()
+  where lower(email) = 'heynazmulhossain@gmail.com';
+
+  -- Otherwise keep an existing deployment unlocked by promoting the oldest account.
   if not exists (select 1 from public.profiles where role = 'owner') then
     select id into first_id
     from public.profiles

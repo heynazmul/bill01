@@ -53,6 +53,16 @@ function HistoryPage() {
   const rows = data.filter(
     (b) => (!fMonth || b.bill_month === fMonth) && (!fYear || b.bill_year === fYear),
   );
+  const payDue = payBill
+    ? paymentBalance(Number(payBill.total), Number(payBill.amount_paid)).due
+    : 0;
+
+  // Start the payment dialog with the outstanding amount already filled in.
+  function openPayment(bill: Bill) {
+    const due = paymentBalance(Number(bill.total), Number(bill.amount_paid)).due;
+    setPayAmount(due > 0 ? String(due) : "");
+    setPayBill(bill);
+  }
 
   async function recordPayment() {
     if (!canManage) {
@@ -245,7 +255,7 @@ function HistoryPage() {
                             variant="ghost"
                             title="Record payment"
                             aria-label="Record payment"
-                            onClick={() => setPayBill(b)}
+                            onClick={() => openPayment(b)}
                           >
                             <Wallet className="h-4 w-4" />
                           </Button>
@@ -270,9 +280,8 @@ function HistoryPage() {
           {payBill && (
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Total {taka(payBill.total)} · Paid {taka(payBill.amount_paid)} · Due{" "}
-                {taka(paymentBalance(Number(payBill.total), Number(payBill.amount_paid)).due)} ·
-                Extra paid{" "}
+                Total {taka(payBill.total)} · Paid {taka(payBill.amount_paid)} · Due {taka(payDue)}{" "}
+                · Extra paid{" "}
                 {taka(paymentBalance(Number(payBill.total), Number(payBill.amount_paid)).extraPaid)}
               </p>
               <div className="space-y-2">
@@ -286,6 +295,26 @@ function HistoryPage() {
                   value={payAmount}
                   onChange={(e) => setPayAmount(e.target.value)}
                 />
+                {payDue > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setPayAmount(String(payDue))}
+                    >
+                      Pay full due ({taka(payDue)})
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setPayAmount(String(payDue + 500))}
+                    >
+                      Due + ৳500 extra
+                    </Button>
+                  </div>
+                )}
               </div>
               {Number.isFinite(Number(payAmount)) && Number(payAmount) > 0 && (
                 <p className="font-medium text-success">

@@ -145,7 +145,7 @@ The app has three access levels:
 Run `supabase/migrations/20261030000000_account_approval.sql` once in the Supabase SQL editor (or with the Supabase CLI). It creates the `profiles` table, the sign-up trigger and the owner-only approval function, then keeps public read access while restricting writes to approved accounts.
 
 1. Run the migration.
-2. Create your account first — the first account becomes the owner automatically.
+2. Sign up with the admin email (`heynazmulhossain@gmail.com`) — that account becomes the owner. Any other sign-up is a pending request.
 3. Later sign-ups appear as **Account requests** on the dashboard (and as a bell badge in the header) until the owner approves or rejects them.
 4. If you already have auth users and need to promote one manually:
    ```sql
@@ -153,6 +153,8 @@ Run `supabase/migrations/20261030000000_account_approval.sql` once in the Supaba
    set role = 'owner', status = 'approved'
    where email = 'you@example.com';
    ```
+
+The admin email is hard-coded twice in the migration (`is_owner()` and `handle_new_user()`) — change both if the owner email ever changes.
 
 If email confirmation is enabled in Supabase Authentication, new users must confirm their email before logging in. The owner can still see and approve the request while it is pending.
 

@@ -24,7 +24,7 @@ function Layout() {
     queryFn: fetchPendingProfiles,
     enabled: isOwner,
     retry: false,
-    refetchInterval: 20_000,
+    refetchInterval: 15_000,
   });
   const pendingCount = pending.data?.length ?? 0;
 

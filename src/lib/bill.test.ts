@@ -1,8 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { calculateBill, paymentBalance, paymentStatus } from "./bill";
+import { carriedDue, calculateBill, paymentBalance, paymentStatus } from "./bill";
 
 const base = {
-  previousReading: 1000, currentReading: 1150, rate: 8, previousDue: 500, amountPaid: 0,
+  previousReading: 1000,
+  currentReading: 1150,
+  rate: 8,
+  previousDue: 500,
+  amountPaid: 0,
 };
 
 describe("calculateBill", () => {
@@ -37,5 +41,24 @@ describe("paymentStatus", () => {
     expect(paymentStatus(100, 0)).toBe("Unpaid");
     expect(paymentStatus(100, 40)).toBe("Partially paid");
     expect(paymentStatus(100, 100)).toBe("Paid");
+  });
+});
+
+describe("carriedDue", () => {
+  it("returns 0 when there are no previous bills", () => {
+    expect(carriedDue([])).toBe(0);
+  });
+
+  it("carries the newest bill's outstanding due forward", () => {
+    expect(
+      carriedDue([
+        { total: 10456, amount_paid: 9132 },
+        { total: 9868, amount_paid: 9868 },
+      ]),
+    ).toBe(1324);
+  });
+
+  it("never carries a negative due when the last bill was overpaid", () => {
+    expect(carriedDue([{ total: 8080, amount_paid: 8500 }])).toBe(0);
   });
 });

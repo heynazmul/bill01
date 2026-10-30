@@ -6,14 +6,15 @@ import { FileText, Save } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchBills, fetchSettings, SINGLETON_ID, type Bill } from "@/lib/data";
 import { useAuth } from "@/lib/auth";
-import { calculateBill, FIXED_HOUSE_RENT, MONTHS, taka } from "@/lib/bill";
+import { calculateBill, carriedDue, FIXED_HOUSE_RENT, MONTHS, taka } from "@/lib/bill";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ReceiptView } from "@/components/ReceiptActions";
 
-type Num = "previous_reading" | "current_reading" | "electricity_rate" | "previous_due" | "amount_paid";
+type Num =
+  "previous_reading" | "current_reading" | "electricity_rate" | "previous_due" | "amount_paid";
 
 export function BillForm({ existing }: { existing?: Bill }) {
   const qc = useQueryClient();
@@ -28,12 +29,15 @@ export function BillForm({ existing }: { existing?: Bill }) {
     const e = existing;
     const s = (n: unknown) => (n == null ? "" : String(Number(n)));
     return {
-      previous_reading: s(e?.previous_reading), current_reading: s(e?.current_reading),
-      electricity_rate: s(e?.electricity_rate), previous_due: s(e?.previous_due ?? 0),
+      previous_reading: s(e?.previous_reading),
+      current_reading: s(e?.current_reading),
+      electricity_rate: s(e?.electricity_rate),
+      previous_due: s(e?.previous_due ?? 0),
       amount_paid: s(e?.amount_paid ?? 0),
     };
   });
   const [prefilled, setPrefilled] = useState(!!existing);
+  const [paidInFull, setPaidInFull] = useState(false);
   const [preview, setPreview] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -41,26 +45,43 @@ export function BillForm({ existing }: { existing?: Bill }) {
   useEffect(() => {
     if (prefilled || settingsQ.isLoading || billsQ.isLoading) return;
     const st = settingsQ.data;
-    const last = billsQ.data?.[0];
+    const list = billsQ.data ?? [];
+    const last = list[0];
+    const due = carriedDue(list);
     setV((p) => ({
       ...p,
       previous_reading: last ? String(Number(last.current_reading)) : p.previous_reading,
       electricity_rate: String(Number(st?.electricity_rate ?? 0)),
+      previous_due: due > 0 ? String(due) : p.previous_due,
     }));
     setPrefilled(true);
   }, [prefilled, settingsQ.isLoading, billsQ.isLoading, settingsQ.data, billsQ.data]);
 
   const n = (k: Num) => Number(v[k] || 0);
   const calc = useMemo(
-    () => calculateBill({
-      previousReading: n("previous_reading"), currentReading: n("current_reading"), rate: n("electricity_rate"),
-      previousDue: n("previous_due"), amountPaid: n("amount_paid"),
-    }),
+    () =>
+      calculateBill({
+        previousReading: n("previous_reading"),
+        currentReading: n("current_reading"),
+        rate: n("electricity_rate"),
+        previousDue: n("previous_due"),
+        amountPaid: n("amount_paid"),
+      }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [v],
   );
 
-  const duplicate = billsQ.data?.find((b) => b.bill_year === year && b.bill_month === month && b.id !== existing?.id);
+  // Keep the paid amount in sync with the total while "Paid in full" is ticked.
+  useEffect(() => {
+    if (!paidInFull) return;
+    setV((p) =>
+      Number(p.amount_paid) === calc.total ? p : { ...p, amount_paid: String(calc.total) },
+    );
+  }, [paidInFull, calc.total]);
+
+  const duplicate = billsQ.data?.find(
+    (b) => b.bill_year === year && b.bill_month === month && b.id !== existing?.id,
+  );
   const readingError =
     v.current_reading !== "" && n("current_reading") < n("previous_reading")
       ? "Current reading cannot be lower than the previous reading."
@@ -71,7 +92,8 @@ export function BillForm({ existing }: { existing?: Bill }) {
     if (v.current_reading === "") return "Enter the current meter reading.";
     if (negative) return "Values cannot be negative.";
     if (readingError) return readingError;
-    if (duplicate) return `A bill for ${MONTHS[month - 1]} ${year} already exists. Edit that bill instead.`;
+    if (duplicate)
+      return `A bill for ${MONTHS[month - 1]} ${year} already exists. Edit that bill instead.`;
     return null;
   }
 
@@ -83,19 +105,40 @@ export function BillForm({ existing }: { existing?: Bill }) {
     if (err) return void toast.error(err);
     setBusy(true);
     const row = {
-      bill_year: year, bill_month: month,
-      previous_reading: n("previous_reading"), current_reading: n("current_reading"),
-      units: calc.units, electricity_rate: n("electricity_rate"), electricity_bill: calc.electricityBill,
-      house_rent: FIXED_HOUSE_RENT, gas_bill: 0, water_bill: 0,
-      other_charges: 0, previous_due: n("previous_due"), discount: 0,
-      total: calc.total, amount_paid: n("amount_paid"), due: calc.due,
+      bill_year: year,
+      bill_month: month,
+      previous_reading: n("previous_reading"),
+      current_reading: n("current_reading"),
+      units: calc.units,
+      electricity_rate: n("electricity_rate"),
+      electricity_bill: calc.electricityBill,
+      house_rent: FIXED_HOUSE_RENT,
+      gas_bill: 0,
+      water_bill: 0,
+      other_charges: 0,
+      previous_due: n("previous_due"),
+      discount: 0,
+      total: calc.total,
+      amount_paid: n("amount_paid"),
+      due: calc.due,
     };
     const res = existing
-      ? await supabase.from("bills").update({ ...row, updated_at: new Date().toISOString() }).eq("id", existing.id).select().single()
-      : await supabase.from("bills").insert({ ...row, user_id: SINGLETON_ID }).select().single();
+      ? await supabase
+          .from("bills")
+          .update({ ...row, updated_at: new Date().toISOString() })
+          .eq("id", existing.id)
+          .select()
+          .single()
+      : await supabase
+          .from("bills")
+          .insert({ ...row, user_id: SINGLETON_ID })
+          .select()
+          .single();
     setBusy(false);
     if (res.error) {
-      return void toast.error(res.error.code === "23505" ? "A bill for this month already exists." : res.error.message);
+      return void toast.error(
+        res.error.code === "23505" ? "A bill for this month already exists." : res.error.message,
+      );
     }
     toast.success("Bill saved");
     qc.invalidateQueries({ queryKey: ["bills"] });
@@ -106,8 +149,16 @@ export function BillForm({ existing }: { existing?: Bill }) {
   const field = (k: Num, label: string, hint?: string) => (
     <div className="space-y-2">
       <Label htmlFor={k}>{label}</Label>
-      <Input id={k} type="number" step="any" min={0} inputMode="decimal" className="h-12 text-base"
-        value={v[k]} onChange={(e) => setV({ ...v, [k]: e.target.value })} />
+      <Input
+        id={k}
+        type="number"
+        step="any"
+        min={0}
+        inputMode="decimal"
+        className="h-12 text-base"
+        value={v[k]}
+        onChange={(e) => setV({ ...v, [k]: e.target.value })}
+      />
       {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
     </div>
   );
@@ -121,20 +172,44 @@ export function BillForm({ existing }: { existing?: Bill }) {
         <section className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="month">Billing month</Label>
-            <select id="month" className={selectCls} value={month} onChange={(e) => setMonth(Number(e.target.value))}>
-              {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+            <select
+              id="month"
+              className={selectCls}
+              value={month}
+              onChange={(e) => setMonth(Number(e.target.value))}
+            >
+              {MONTHS.map((m, i) => (
+                <option key={m} value={i + 1}>
+                  {m}
+                </option>
+              ))}
             </select>
           </div>
           <div className="space-y-2">
             <Label htmlFor="year">Year</Label>
-            <select id="year" className={selectCls} value={year} onChange={(e) => setYear(Number(e.target.value))}>
-              {years.map((y) => <option key={y} value={y}>{y}</option>)}
+            <select
+              id="year"
+              className={selectCls}
+              value={year}
+              onChange={(e) => setYear(Number(e.target.value))}
+            >
+              {years.map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
             </select>
           </div>
           {duplicate && (
             <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive sm:col-span-2">
               A bill for this month already exists.{" "}
-              <Link to="/bills/$id/edit" params={{ id: duplicate.id }} className="font-semibold underline">Edit it instead</Link>
+              <Link
+                to="/bills/$id/edit"
+                params={{ id: duplicate.id }}
+                className="font-semibold underline"
+              >
+                Edit it instead
+              </Link>
             </p>
           )}
         </section>
@@ -142,7 +217,13 @@ export function BillForm({ existing }: { existing?: Bill }) {
         <section className="space-y-4 rounded-xl border bg-secondary/50 p-4">
           <h2 className="font-semibold text-primary">Electricity meter</h2>
           <div className="grid gap-4 sm:grid-cols-2">
-            {field("previous_reading", "Previous reading", existing ? undefined : "Taken from last month's closing reading — you can correct it.")}
+            {field(
+              "previous_reading",
+              "Previous reading",
+              existing
+                ? undefined
+                : "Taken from last month's closing reading — you can correct it.",
+            )}
             {field("current_reading", "Current reading")}
           </div>
           {readingError && <p className="text-sm font-medium text-destructive">{readingError}</p>}
@@ -150,22 +231,92 @@ export function BillForm({ existing }: { existing?: Bill }) {
         </section>
 
         <section className="grid gap-4 sm:grid-cols-2">
-          {field("previous_due", "Previous due (৳)")}
-          {field("amount_paid", "Amount paid now (৳)")}
+          {field(
+            "previous_due",
+            "Previous due (৳)",
+            existing
+              ? undefined
+              : "Auto-filled from the last bill's remaining due. You can change it.",
+          )}
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Label htmlFor="amount_paid">Amount paid now (৳)</Label>
+              <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-primary"
+                  checked={paidInFull}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setPaidInFull(checked);
+                    if (checked) setV((p) => ({ ...p, amount_paid: String(calc.total) }));
+                  }}
+                />
+                Paid in full
+              </label>
+            </div>
+            <Input
+              id="amount_paid"
+              type="number"
+              step="any"
+              min={0}
+              inputMode="decimal"
+              className="h-12 text-base"
+              value={v.amount_paid}
+              onChange={(e) => {
+                setPaidInFull(false);
+                setV({ ...v, amount_paid: e.target.value });
+              }}
+            />
+            <p className="text-xs text-muted-foreground">
+              Anything above the total is recorded as extra paid (advance).
+            </p>
+          </div>
         </section>
       </div>
 
       <aside className="h-fit space-y-4 rounded-xl border-2 border-primary bg-card p-5 lg:sticky lg:top-6">
         <h2 className="font-semibold">Bill summary</h2>
         <dl className="space-y-2 text-sm">
-          <div className="flex justify-between"><dt className="text-muted-foreground">House rent (fixed)</dt><dd>{taka(FIXED_HOUSE_RENT)}</dd></div>
-          <div className="flex justify-between"><dt className="text-muted-foreground">Units used</dt><dd>{calc.units}</dd></div>
-          <div className="flex justify-between"><dt className="text-muted-foreground">Electricity bill</dt><dd>{taka(calc.electricityBill)}</dd></div>
-          <div className="flex justify-between border-t pt-2 text-lg font-bold"><dt>Total</dt><dd className="text-primary">{taka(calc.total)}</dd></div>
-          <div className="flex justify-between"><dt className="text-muted-foreground">Remaining due</dt><dd>{taka(calc.due)}</dd></div>
-          <div className="flex justify-between"><dt className="text-muted-foreground">Extra paid</dt><dd className="text-success">{taka(calc.extraPaid)}</dd></div>
+          <div className="flex justify-between">
+            <dt className="text-muted-foreground">House rent (fixed)</dt>
+            <dd>{taka(FIXED_HOUSE_RENT)}</dd>
+          </div>
+          <div className="flex justify-between">
+            <dt className="text-muted-foreground">Units used</dt>
+            <dd>{calc.units}</dd>
+          </div>
+          <div className="flex justify-between">
+            <dt className="text-muted-foreground">Electricity bill</dt>
+            <dd>{taka(calc.electricityBill)}</dd>
+          </div>
+          <div className="flex justify-between border-t pt-2 text-lg font-bold">
+            <dt>Total</dt>
+            <dd className="text-primary">{taka(calc.total)}</dd>
+          </div>
+          <div className="flex justify-between">
+            <dt className="text-muted-foreground">Remaining due</dt>
+            <dd>{taka(calc.due)}</dd>
+          </div>
+          <div className="flex justify-between">
+            <dt className="text-muted-foreground">Extra paid</dt>
+            <dd className="text-success">{taka(calc.extraPaid)}</dd>
+          </div>
         </dl>
-        <Button size="lg" className="h-14 w-full text-base" onClick={() => { const e = validate(); if (e) toast.error(e); else setPreview(true); }}>
+        {calc.extraPaid > 0 && (
+          <p className="rounded-md bg-secondary p-3 text-xs text-muted-foreground">
+            Extra paid is advance credit and will be adjusted with the next bill.
+          </p>
+        )}
+        <Button
+          size="lg"
+          className="h-14 w-full text-base"
+          onClick={() => {
+            const e = validate();
+            if (e) toast.error(e);
+            else setPreview(true);
+          }}
+        >
           <FileText className="mr-2 h-5 w-5" /> Generate Receipt
         </Button>
         <Button size="lg" variant="outline" className="h-12 w-full" onClick={save} disabled={busy}>
@@ -175,18 +326,33 @@ export function BillForm({ existing }: { existing?: Bill }) {
 
       <Dialog open={preview} onOpenChange={setPreview}>
         <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
-          <DialogHeader className="no-print"><DialogTitle>Receipt preview</DialogTitle></DialogHeader>
+          <DialogHeader className="no-print">
+            <DialogTitle className="font-bangla">রসিদ প্রিভিউ</DialogTitle>
+          </DialogHeader>
           <ReceiptView
             tenantName={settingsQ.data?.tenant_name ?? ""}
             address={settingsQ.data?.address ?? ""}
             data={{
-              bill_no: existing?.bill_no ?? null, bill_year: year, bill_month: month,
-              previous_reading: n("previous_reading"), current_reading: n("current_reading"), units: calc.units,
-              electricity_rate: n("electricity_rate"), electricity_bill: calc.electricityBill,
-              house_rent: FIXED_HOUSE_RENT, previous_due: n("previous_due"),
-              total: calc.total, amount_paid: n("amount_paid"), due: calc.due, created_at: existing?.created_at ?? null,
+              bill_no: existing?.bill_no ?? null,
+              bill_year: year,
+              bill_month: month,
+              previous_reading: n("previous_reading"),
+              current_reading: n("current_reading"),
+              units: calc.units,
+              electricity_rate: n("electricity_rate"),
+              electricity_bill: calc.electricityBill,
+              house_rent: FIXED_HOUSE_RENT,
+              previous_due: n("previous_due"),
+              total: calc.total,
+              amount_paid: n("amount_paid"),
+              due: calc.due,
+              created_at: existing?.created_at ?? null,
             }}
-            extra={<Button onClick={save} disabled={busy}><Save className="mr-2 h-4 w-4" /> Save bill</Button>}
+            extra={
+              <Button onClick={save} disabled={busy}>
+                <Save className="mr-2 h-4 w-4" /> Save bill
+              </Button>
+            }
           />
         </DialogContent>
       </Dialog>
