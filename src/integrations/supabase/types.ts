@@ -86,6 +86,42 @@ export type Database = {
         }
         Relationships: []
       }
+      profiles: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          display_name: string | null
+          email: string
+          id: string
+          role: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          display_name?: string | null
+          email?: string
+          id: string
+          role?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          display_name?: string | null
+          email?: string
+          id?: string
+          role?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       house_settings: {
         Row: {
           address: string
@@ -127,7 +163,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_approved: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      is_owner: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      review_account: {
+        Args: { decision: string; target_id: string }
+        Returns: Database["public"]["Tables"]["profiles"]["Row"]
+      }
     }
     Enums: {
       [_ in never]: never

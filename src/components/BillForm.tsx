@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { FileText, Save } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchBills, fetchSettings, SINGLETON_ID, type Bill } from "@/lib/data";
+import { useAuth } from "@/lib/auth";
 import { calculateBill, FIXED_HOUSE_RENT, MONTHS, taka } from "@/lib/bill";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +18,7 @@ type Num = "previous_reading" | "current_reading" | "electricity_rate" | "previo
 export function BillForm({ existing }: { existing?: Bill }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const { isApproved } = useAuth();
   const settingsQ = useQuery({ queryKey: ["settings"], queryFn: fetchSettings });
   const billsQ = useQuery({ queryKey: ["bills"], queryFn: fetchBills });
   const now = new Date();
@@ -74,6 +76,9 @@ export function BillForm({ existing }: { existing?: Bill }) {
   }
 
   async function save() {
+    if (!isApproved) {
+      return void toast.error("Sign in with an approved account to save bills.");
+    }
     const err = validate();
     if (err) return void toast.error(err);
     setBusy(true);

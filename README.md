@@ -131,6 +131,38 @@ This project was built with [Lovable](https://lovable.dev).
 
 **Live app**: https://bill01.lovable.app
 
+## Accounts and approval
+
+The app has three access levels:
+
+- **Public (no login)** — view the dashboard, bill history, receipts and settings.
+- **Approved account** — add/edit bills and record payments.
+- **Owner** — everything above, plus change settings and approve or reject new accounts from the dashboard.
+
+### Required database setup
+
+Run `supabase/migrations/20261030000000_account_approval.sql` once in the Supabase SQL editor (or with the Supabase CLI). It creates the `profiles` table, the sign-up trigger and the owner-only approval function, then keeps public read access while restricting writes to approved accounts.
+
+1. Run the migration.
+2. Create your account first — the first account becomes the owner automatically.
+3. Later sign-ups appear as **Account requests** on the dashboard (and as a bell badge in the header) until the owner approves or rejects them.
+4. If you already have auth users and need to promote one manually:
+   ```sql
+   update public.profiles
+   set role = 'owner', status = 'approved'
+   where email = 'you@example.com';
+   ```
+
+If email confirmation is enabled in Supabase Authentication, new users must confirm their email before logging in. The owner can still see and approve the request while it is pending.
+
+For a private home app, the simplest setup is often:
+
+- **Authentication → Providers → Email**: keep Email enabled.
+- Turn off **Confirm email** if you do not want to configure email delivery. New accounts still wait for owner approval before they can write.
+- **Authentication → URL Configuration**: add your local URL (for example `http://localhost:8081`) and your deployed URL to the redirect allow list if you keep email confirmation on.
+
+Never put the Supabase `service_role` key in `.env` or in client code.
+
 ## Build with Lovable
 
 Continue developing this project in the [Lovable editor](https://lovable.dev/projects/8e3dba3a-857e-4a1f-b194-9ad1f5e3aa17).

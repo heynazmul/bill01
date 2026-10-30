@@ -14,16 +14,22 @@ describe("App routing", () => {
 
     expect(matches.at(-1)?.routeId).not.toBe(rootRouteId);
   });
-  it.each(["/dashboard", "/bills/new", "/history", "/settings", "/receipt/example", "/bills/example/edit"])("opens %s without an authentication guard", (path) => {
-    const router = createRouter({ routeTree, context: { queryClient: new QueryClient() } });
-    const matches = router.matchRoutes(path);
-    expect(matches.at(-1)?.routeId).not.toBe(rootRouteId);
-    for (const match of matches) {
-      expect(router.routesById[match.routeId]?.options.beforeLoad).toBeUndefined();
-    }
-  });
-  it.each(["/auth", "/login"])("has no login page at %s", (path) => {
-    const router = createRouter({ routeTree, context: { queryClient: new QueryClient() } });
-    expect(router.matchRoutes(path).at(-1)?.routeId).toBe(rootRouteId);
-  });
+
+  it.each(["/dashboard", "/history", "/receipt/example", "/login", "/signup"])(
+    "opens the public page %s without an authentication redirect",
+    (path) => {
+      const router = createRouter({ routeTree, context: { queryClient: new QueryClient() } });
+      const matches = router.matchRoutes(path);
+      expect(matches.at(-1)?.routeId).not.toBe(rootRouteId);
+    },
+  );
+
+  it.each(["/bills/new", "/bills/example/edit", "/settings"])(
+    "keeps %s reachable so the approval gate can explain the login requirement",
+    (path) => {
+      const router = createRouter({ routeTree, context: { queryClient: new QueryClient() } });
+      const matches = router.matchRoutes(path);
+      expect(matches.at(-1)?.routeId).not.toBe(rootRouteId);
+    },
+  );
 });

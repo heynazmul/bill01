@@ -9,17 +9,30 @@ import { FIXED_HOUSE_RENT, taka } from "@/lib/bill";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RequireApproved } from "@/components/RequireApproved";
 
 export const Route = createFileRoute("/_app/settings")({
-  head: () => ({ meta: [
-    { title: "Settings — House Bill Tracker" },
-    { name: "description", content: "Save house details and electricity rate with fixed monthly rent of ৳8,080." },
-    { property: "og:title", content: "Settings — House Bill Tracker" },
-    { property: "og:description", content: "Save house details and electricity rate with fixed monthly rent of ৳8,080." },
-    { property: "og:type", content: "website" },
-    { name: "twitter:card", content: "summary_large_image" },
-  ] }),
-  component: SettingsPage,
+  head: () => ({
+    meta: [
+      { title: "Settings — House Bill Tracker" },
+      {
+        name: "description",
+        content: "Save house details and electricity rate with fixed monthly rent of ৳8,080.",
+      },
+      { property: "og:title", content: "Settings — House Bill Tracker" },
+      {
+        property: "og:description",
+        content: "Save house details and electricity rate with fixed monthly rent of ৳8,080.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
+    ],
+  }),
+  component: () => (
+    <RequireApproved ownerOnly>
+      <SettingsPage />
+    </RequireApproved>
+  ),
 });
 
 const money = z.coerce.number().min(0, "Amounts cannot be negative").max(100000000);
@@ -40,14 +53,17 @@ function SettingsPage() {
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["settings"], queryFn: fetchSettings });
   const [form, setForm] = useState<Form>({
-    tenant_name: "", address: "", electricity_rate: "0",
+    tenant_name: "",
+    address: "",
+    electricity_rate: "0",
   });
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (data)
       setForm({
-        tenant_name: data.tenant_name, address: data.address,
+        tenant_name: data.tenant_name,
+        address: data.address,
         electricity_rate: String(data.electricity_rate),
       });
   }, [data]);
@@ -55,11 +71,18 @@ function SettingsPage() {
   async function save(e: React.FormEvent) {
     e.preventDefault();
     const parsed = schema.safeParse(form);
-    if (!parsed.success) return void toast.error(parsed.error.issues[0]?.message ?? "Invalid input");
+    if (!parsed.success)
+      return void toast.error(parsed.error.issues[0]?.message ?? "Invalid input");
     setBusy(true);
-    const { error } = await supabase
-      .from("house_settings")
-      .upsert({ ...parsed.data, house_rent: FIXED_HOUSE_RENT, gas_bill: 0, water_bill: 0, other_charges: 0, user_id: SINGLETON_ID, updated_at: new Date().toISOString() });
+    const { error } = await supabase.from("house_settings").upsert({
+      ...parsed.data,
+      house_rent: FIXED_HOUSE_RENT,
+      gas_bill: 0,
+      water_bill: 0,
+      other_charges: 0,
+      user_id: SINGLETON_ID,
+      updated_at: new Date().toISOString(),
+    });
     setBusy(false);
     if (error) return void toast.error(error.message);
     toast.success("Settings saved");
@@ -91,7 +114,9 @@ function SettingsPage() {
           />
         </div>
       ))}
-      <Button type="submit" size="lg" className="h-12 w-full text-base" disabled={busy}>Save settings</Button>
+      <Button type="submit" size="lg" className="h-12 w-full text-base" disabled={busy}>
+        Save settings
+      </Button>
     </form>
   );
 }
